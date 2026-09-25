@@ -223,23 +223,28 @@ def image_to_escpos_page(img: Image.Image, dots_width: int, shift: int = 0) -> b
     vat ly cua dau in), phan con lai giu nguyen ty le/kich thuoc, khong bi
     co/nen.
     """
-    img = img.convert("RGB")
-    w, h = img.size
+    # Tinh mask "muc" o do phan giai GOC roi moi thu nho: neu thu nho anh
+    # truoc, khe trang hep giua cac vach ma vach bi LANCZOS lam nhoe thanh
+    # xam, gap nguong INK_WHITE_THRESHOLD (230) la thanh den -> vach dinh vao
+    # nhau. Thu nho mask bang BOX (trung binh dien tich) + nguong 50% giu dung
+    # ty le den/trang cua vach va khe, chu mau nhat van duoc tinh la muc.
+    mask = _ink_mask(img)
+    w, h = mask.size
     if w != dots_width:
         new_h = max(1, round(h * dots_width / max(w, 1)))
-        img = img.resize((dots_width, new_h), Image.LANCZOS)
+        mask = mask.resize((dots_width, new_h), Image.BOX)
 
     if shift != 0:
-        canvas = Image.new("RGB", (dots_width, img.size[1]), color=(255, 255, 255))
-        canvas.paste(img, (shift, 0))
-        img = canvas
+        canvas = Image.new("L", (dots_width, mask.size[1]), color=0)
+        canvas.paste(mask, (shift, 0))
+        mask = canvas
 
-    # "Muc" = diem khong phai nen trang -> bit 1 (in den). PIL mode "1" dong
-    # goi san 8 diem/byte, MSB truoc, moi dong cang byte - dung khop voi
-    # dinh dang ma lenh ESC/POS "GS v 0" can.
-    bw = _ink_mask(img).convert("1")
+    # "Muc" -> bit 1 (in den). PIL mode "1" dong goi san 8 diem/byte, MSB
+    # truoc, moi dong cang byte - dung khop voi dinh dang lenh ESC/POS
+    # "GS v 0" can.
+    bw = mask.point(lambda p: 255 if p >= 128 else 0).convert("1")
     packed = bw.tobytes()
-    out_width = img.size[0]
+    out_width = mask.size[0]
     bytes_per_row = (out_width + 7) // 8
     height = bw.size[1]
 
