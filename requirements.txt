@@ -1,5 +1,6 @@
 flask==3.0.3
 pymupdf==1.24.11
+pymupdf-fonts==1.0.5
 pillow==10.4.0
 requests==2.32.3
 gunicorn==22.0.0
